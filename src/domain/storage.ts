@@ -1,7 +1,8 @@
 import type { BoardStateV1, BoardStateV2, ColumnId, JobCard } from './types';
 import { COLUMN_ORDER } from './types';
 
-const KEY = 'job-tracker:board:v2';
+const KEY_V2 = 'job-tracker:board:v2';
+const KEY_V1 = 'job-tracker:board:v1';
 
 function emptyV2(): BoardStateV2 {
   return {
@@ -16,51 +17,113 @@ function emptyV2(): BoardStateV2 {
   };
 }
 
-function looksLikeV2(x: unknown): x is BoardStateV2 {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isColumnId(value: unknown): value is ColumnId {
   return (
-    typeof x === 'object' &&
-    x !== null &&
-    (x as any).version === 2 &&
-    typeof (x as any).cardsById === 'object' &&
-    typeof (x as any).columnCardIds === 'object'
+    typeof value === 'string' && (COLUMN_ORDER as string[]).includes(value)
   );
 }
 
-function looksLikeV1(x: unknown): x is BoardStateV1 {
-  return typeof x === 'object' && x !== null && Array.isArray((x as any).cards);
+function isJobCard(value: unknown): value is JobCard {
+  if (!isRecord(value)) return false;
+
+  const id = value.id;
+  const company = value.company;
+  const role = value.role;
+  const appliedDate = value.appliedDate;
+  const columnId = value.columnId;
+
+  if (typeof id !== 'string') return false;
+  if (typeof company !== 'string') return false;
+  if (typeof role !== 'string') return false;
+  if (typeof appliedDate !== 'string') return false;
+  if (!isColumnId(columnId)) return false;
+
+  // optional fields
+  if (
+    'link' in value &&
+    value.link !== undefined &&
+    typeof value.link !== 'string'
+  )
+    return false;
+  if (
+    'workMode' in value &&
+    value.workMode !== undefined &&
+    value.workMode !== 'remote' &&
+    value.workMode !== 'hybrid' &&
+    value.workMode !== 'onsite'
+  )
+    return false;
+
+  if ('techStack' in value && value.techStack !== undefined) {
+    if (!Array.isArray(value.techStack)) return false;
+    if (!value.techStack.every((t) => typeof t === 'string')) return false;
+  }
+
+  return true;
+}
+
+function looksLikeV2(value: unknown): value is BoardStateV2 {
+  if (!isRecord(value)) return false;
+  if (value.version !== 2) return false;
+
+  const cardsById = value.cardsById;
+  const columnCardIds = value.columnCardIds;
+
+  if (!isRecord(cardsById) || !isRecord(columnCardIds)) return false;
+
+  // validate columnCardIds shape
+  for (const col of COLUMN_ORDER) {
+    const ids = columnCardIds[col];
+    if (!Array.isArray(ids) || !ids.every((x) => typeof x === 'string'))
+      return false;
+  }
+
+  // validate cardsById values
+  for (const k of Object.keys(cardsById)) {
+    if (!isJobCard(cardsById[k])) return false;
+  }
+
+  return true;
+}
+
+function looksLikeV1(value: unknown): value is BoardStateV1 {
+  if (!isRecord(value)) return false;
+  const cards = value.cards;
+  if (!Array.isArray(cards)) return false;
+  return cards.every(isJobCard);
 }
 
 function migrateV1toV2(v1: BoardStateV1): BoardStateV2 {
   const next = emptyV2();
 
-  for (const c of v1.cards) {
-    next.cardsById[c.id] = c;
-    // preserve their columnId and append
-    next.columnCardIds[c.columnId].push(c.id);
-  }
-
-  // Ensure all columns exist / stable
-  for (const col of COLUMN_ORDER) {
-    next.columnCardIds[col] = next.columnCardIds[col] ?? [];
+  for (const card of v1.cards) {
+    next.cardsById[card.id] = card;
+    next.columnCardIds[card.columnId].push(card.id);
   }
 
   return next;
 }
 
+/** Always returns a valid V2 state */
 export function loadBoard(): BoardStateV2 {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    // Try v2 first
+    const rawV2 = localStorage.getItem(KEY_V2);
+    if (rawV2) {
+      const parsed: unknown = JSON.parse(rawV2);
       if (looksLikeV2(parsed)) return parsed;
     }
 
-    // Try old key if you used v1 earlier (optional):
-    const oldRaw = localStorage.getItem('job-tracker:board:v1');
-    if (oldRaw) {
-      const parsedOld = JSON.parse(oldRaw);
-      if (looksLikeV1(parsedOld)) {
-        const migrated = migrateV1toV2(parsedOld);
+    // Fallback: migrate v1 if present
+    const rawV1 = localStorage.getItem(KEY_V1);
+    if (rawV1) {
+      const parsed: unknown = JSON.parse(rawV1);
+      if (looksLikeV1(parsed)) {
+        const migrated = migrateV1toV2(parsed);
         saveBoard(migrated);
         return migrated;
       }
@@ -73,5 +136,5 @@ export function loadBoard(): BoardStateV2 {
 }
 
 export function saveBoard(state: BoardStateV2) {
-  localStorage.setItem(KEY, JSON.stringify(state));
+  localStorage.setItem(KEY_V2, JSON.stringify(state));
 }
