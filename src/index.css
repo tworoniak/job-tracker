@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
+@import 'tailwindcss';
+@tailwind utilities;
+
+@config "../tailwind.config.js";
+
+/* @tailwind base;
+@tailwind components;
+@tailwind utilities; */
+
+:root {
+  color-scheme: light;
+}
+
+/* Global styles for html/body */
+@layer base {
+  html {
+    @apply bg-background text-text;
+  }
+
+  button,
+  select {
+    @apply cursor-pointer;
+  }
+}
+
+/* Optional utility for subtle photo hover effect */
+@layer components {
+  .photo-hover {
+    @apply transition-transform duration-300 hover:scale-[1.02];
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100%;
+}
+
+/* Scroll to top */
+
+.scroll-to-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  /* border: none; */
+  cursor: pointer;
+  /* background-color: #666; */
+  color: white;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.95);
+
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.scroll-to-top.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-to-top {
+    transition: none;
+  }
+}
