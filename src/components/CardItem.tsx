@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { CSS } from '@dnd-kit/utilities';
 import { useSortable } from '@dnd-kit/sortable';
 import type { JobCard } from '../domain/types';
+import AiRecruiterMessageModal from './AiRecruiterMessageModal';
 
 export default function CardItem({
   card,
@@ -11,6 +13,8 @@ export default function CardItem({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [aiOpen, setAiOpen] = useState(false);
+
   const {
     attributes,
     listeners,
@@ -38,6 +42,7 @@ export default function CardItem({
         <div className='min-w-0'>
           <div className='truncate text-sm font-semibold'>{card.company}</div>
           <div className='truncate text-xs text-zinc-300'>{card.role}</div>
+
           {card.techStack?.length ? (
             <div className='mt-2 flex flex-wrap gap-1'>
               {card.techStack.slice(0, 4).map((t) => (
@@ -70,7 +75,19 @@ export default function CardItem({
 
       <div className='mt-2 flex items-center justify-between text-xs text-zinc-400'>
         <span>{card.appliedDate}</span>
+
         <div className='flex items-center gap-2'>
+          {/* AI action */}
+          <button
+            className='text-zinc-200 hover:underline'
+            onClick={(e) => {
+              e.stopPropagation();
+              setAiOpen(true);
+            }}
+          >
+            AI
+          </button>
+
           {card.link && (
             <a
               className='text-zinc-200 hover:underline'
@@ -82,14 +99,42 @@ export default function CardItem({
               Link
             </a>
           )}
-          <button className='text-zinc-200 hover:underline' onClick={onEdit}>
+
+          <button
+            className='text-zinc-200 hover:underline'
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
             Edit
           </button>
-          <button className='text-red-300 hover:underline' onClick={onDelete}>
+
+          <button
+            className='text-red-300 hover:underline'
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
             Delete
           </button>
         </div>
       </div>
+
+      <AiRecruiterMessageModal
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        job={{
+          company: card.company,
+          role: card.role,
+          link: card.link,
+          // notes: card.notes, // uncomment once your JobCard has notes
+        }}
+        // onSaveToNotes={(text) => {
+        //   // hook into your update flow once we see it
+        // }}
+      />
     </div>
   );
 }
